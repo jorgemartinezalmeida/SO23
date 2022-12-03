@@ -1,0 +1,180 @@
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+enum
+{ Maxsize = 1024 + 1
+};
+int
+counttokens (char *path)
+{
+  char *aux = NULL;
+  aux = strdup (path);
+  int n = 0;
+  char *rest = NULL;
+  char *token;
+  for (token = strtok_r (aux, "/", &rest);
+       token != NULL; token = strtok_r (NULL, "/", &rest))
+    {
+      n++;
+    }
+  free (aux);
+  return n;
+}
+
+int
+tokenpath (char *list[], char *path)
+{
+
+  char *aux = NULL;
+  aux = strdup (path);
+  int n = 0;
+  char *rest = NULL;
+  char *token;
+  for (token = strtok_r (path, "/", &rest);
+       token != NULL; token = strtok_r (NULL, "/", &rest))
+    {
+      if ((list[n] = malloc ((strlen (token) + 1) * sizeof (char))) == NULL)
+	{
+	  perror ("Error in malloc");
+	  exit (EXIT_FAILURE);
+	}
+      snprintf (list[n], strlen (token) + 1, "%s", token);
+      n++;
+    }
+  free (aux);
+  return n;
+}
+
+void
+directorioprincipal (char *path)
+{
+  char *rest = NULL;
+  char *token;
+  for (token = strtok_r (path, "/", &rest);
+       token != NULL; token = strtok_r (NULL, ":", &rest))
+    {
+      snprintf (path, strlen (token) + 1, "%s", token);
+      break;			/* solo coja el primero */
+    }
+}
+
+char *
+adcwd (char *argument, char *userpath)
+{
+  char cwd[Maxsize] = "";
+  if (argument[0] != '/')
+    {
+      if (getcwd (cwd, Maxsize) == NULL)
+	{
+	  perror ("getcwd");
+	  exit (EXIT_FAILURE);
+	}
+      if ((userpath =
+	   malloc ((strlen (argument) + strlen (cwd) + 2) *
+		   sizeof (char))) == NULL)
+	{
+	  exit (EXIT_FAILURE);
+	}
+      if (argument[0] == '.' && argument[1] == '.')
+	{
+	  for (size_t i = 0; i < strlen (argument); i++)
+	    {			/*quitar ../ */
+	      argument[i] = argument[i + 2];
+	      argument[i + 1] = argument[i + 3];
+	    }
+	  directorioprincipal (cwd);
+	}
+      strncat (cwd, argument,
+	       (strlen (cwd) + strlen (argument) * sizeof (char)));
+      snprintf (userpath, ((strlen (cwd)) + 1) * sizeof (char), "%s\n", cwd);
+    }
+  else
+    {
+      if ((userpath =
+	   (char *) malloc ((strlen (argument) + 1) * sizeof (char))) == NULL)
+	{
+	  exit (EXIT_FAILURE);
+	}
+      snprintf (userpath, (strlen (argument) + 1) * sizeof (char), "%s\n",
+		argument);
+    }
+  return userpath;
+}
+
+int
+limpiarlista (char *elemento, char *siguiente)
+{
+  if (strncmp (siguiente, "..", strlen (siguiente) * sizeof (siguiente)) != 0)
+    {
+      return 1;
+    }
+  return 0;
+}
+
+int
+comprobarpuntos (char *elemento)
+{
+  if ((strncmp (elemento, "..", strlen (elemento) * sizeof (elemento)) != 0)
+      && (strncmp (elemento, ".", strlen (elemento) * sizeof (elemento)) !=
+	  0))
+    {
+      fprintf (stderr, "/%s", elemento);
+      return 1;
+    }
+  return 0;
+}
+
+void
+imprimirlista (char *userpath[], int size)
+{
+  int nprints = 0;
+  for (int i = 0; i < size; i++)
+    {
+      if (i != size - 1)
+	{
+	  if (limpiarlista (userpath[i], userpath[i + 1]) == 1)
+	    {
+	      nprints = nprints + comprobarpuntos (userpath[i]);
+	    }
+	}
+      else
+	{
+	  nprints = nprints + comprobarpuntos (userpath[i]);
+	}
+    }
+  if (nprints == 0)
+    {
+      fprintf (stderr, "/");
+    }
+  fprintf (stderr, "\n");
+}
+
+void
+liberarlista (char *userpath[], int size)
+{
+  for (size_t i = 0; i < size; i++)
+    {
+      free (userpath[i]);
+    }
+}
+
+int
+main (int argc, char *argv[])
+{
+  if (argc != 2)
+    {
+      fprintf (stderr, "Clearpath usage: ./cleanpath path\n");
+      exit (EXIT_SUCCESS);
+    }
+  char *pathtoclean = NULL;
+  pathtoclean = adcwd (argv[1], pathtoclean);
+  int npaths = counttokens (pathtoclean);
+  char *listpath[npaths];
+  tokenpath (listpath, pathtoclean);
+  imprimirlista (listpath, npaths);
+  free (pathtoclean);
+  liberarlista (listpath, npaths);
+  exit (EXIT_SUCCESS);
+}
